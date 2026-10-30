@@ -11,7 +11,7 @@ android {
         minSdk 21
         targetSdk 34
         versionCode 1
-        versionName "1.0.1"
+        versionName "1.0.0"
         consumerProguardFiles "consumer-rules.pro"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -41,6 +41,12 @@ android {
             withJavadocJar()
         }
     }
+
+    testOptions {
+        unitTests {
+            returnDefaultValues = true
+        }
+    }
 }
 
 dependencies {
@@ -61,14 +67,14 @@ afterEvaluate {
         publications {
             release(MavenPublication) {
                 from components.findByName('release') ?: components.findByName('java') ?: components.findByName('default')
-                groupId    = 'com.github.infoadmstudio2020-cyber'
+                groupId = 'com.github.infoadmstudio2020-cyber'
                 artifactId = 'NativeServiceSDK'
-                version    = '1.0.1'
+                version = '1.0.0'
 
                 pom {
-                    name        = 'NativeServiceSDK'
+                    name = 'NativeServiceSDK'
                     description = 'Microkernel service registry and dependency injection container for NativeRuntime Android ecosystem.'
-                    url         = 'https://github.com/infoadmstudio2020-cyber/NativeServiceSDK'
+                    url = 'https://github.com/infoadmstudio2020-cyber/NativeServiceSDK'
                     licenses {
                         license {
                             name = 'Apache-2.0'
@@ -94,4 +100,14 @@ afterEvaluate {
         options.addStringOption('Xdoclint:none', '-quiet')
         options.encoding = 'UTF-8'
     }
+
 }
+
+// One-click Unit Test Runner
+tasks.register('runUnitTests') {
+    group = 'verification'
+    description = 'Runs NativeServiceSDK unit tests.'
+
+    dependsOn('testDebugUnitTest')
+}
+
