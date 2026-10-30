@@ -1,0 +1,101 @@
+# Complete Subsystem Implementation Prompt: NativeServiceSDK (NativeServiceSDK)
+
+You are a Senior Android Java Library Architect, Gradle Build Engineer, and Automated Testing Engineer.
+
+## Goal
+Transform the generated Android Studio scaffold project for **NativeServiceSDK** from a structural stub/demo state into a **100% production-ready, fully working, live-mode Android Java Library** with its companion demonstration app.
+
+---
+
+## Target Project Context
+- **Library Module**: `library`
+- **Companion Demo App**: `app` (includeDemoApp = true)
+- **Maven Group ID**: `com.github.native-runtime`
+- **Artifact ID**: `native-service-sdk`
+- **Semantic Version**: `1.0.0`
+- **Root Java Package**: `com.roni.library.service`
+- **Primary Public Entry Point**: `ServiceRegistry`
+- **Architecture Classification**: `Layer 1: Core Infrastructure` (`L1`)
+- **Direct Ecosystem Dependencies**: NativeRuntimeContracts, NativeLoggerSDK
+- **JDK / AGP Compatibility**: JDK 17, AGP 8.10.1, Gradle 8.13
+- **SDK Target Bounds**: compileSdk 36, minSdk 24, targetSdk 36
+
+---
+
+## Architectural Rules (Strict NativeRuntime Compliance)
+1. **Universal Foundation Compliance**:
+   - Implement or inherit from `NativeRuntimeContracts` (Layer 0) interfaces.
+   - Return standardized `ServiceRegistryResult<T>` with zero unhandled runtime exceptions.
+   - Enforce thread-safe singleton state machines using `AtomicBoolean` / `AtomicReference` / synchronized blocks.
+
+2. **Layer Directionality (Zero Cyclic Dependencies)**:
+   - Only call downward layers. Under no circumstances should `NativeServiceSDK` depend on higher layers.
+   - If this is a Layer 2 Domain Engine, register with `NativeServiceSDK` (Layer 1) using `BaseService` and log diagnostics through `NativeLoggerSDK` (Layer 1).
+
+3. **Pure Java Abstractions & Testability**:
+   - Separate Android OS-dependent code from core business logic using interfaces or adapters.
+   - Maintain a minimum of 85% code coverage with standard JVM JUnit 4 unit tests (executable via `./gradlew :library:test` without an emulator).
+
+---
+
+## Required Key Classes to Implement
+* `com.roni.library.service.ServiceRegistry`
+* `com.roni.library.service.BaseService`
+* `com.roni.library.service.ServiceDescriptor`
+* `com.roni.library.service.ServiceLifecycle`
+* `com.roni.library.service.ServiceInjector`
+
+---
+
+## Core Capabilities to Realize
+- Thread-safe dynamic service registration and lookup
+- Hierarchical lifecycle dispatch (INIT, START, STOP, DESTROY)
+- Automatic dependency resolution order graph
+- Graceful error isolation during service failures
+
+---
+
+## Step-by-Step Execution Plan
+
+### Step 1: Audit and Wire Layer Dependencies
+- Open `library/build.gradle` and verify dependencies.
+- Ensure `com.android.library` and `maven-publish` are active.
+- Verify MavenPublication coordinates: `groupId: com.github.native-runtime`, `artifactId: native-service-sdk`, `version: 1.0.0`.
+
+### Step 2: Implement Core Engine & Internal Models
+- Replace placeholder stub methods in `ServiceRegistry.java` with actual state machine logic, thread pool executors, and error handling guards.
+- Implement internal worker threads, synchronization monitors, and cache mechanisms.
+- Provide comprehensive Javadoc on all public methods and builder classes.
+
+### Step 3: Implement Automated JVM Unit Tests
+- Create unit test classes in `library/src/test/java/com/roni/library/service/`.
+- Verify:
+  1. Singleton lifecycle transitions (initialization, re-initialization guard, release).
+  2. Configuration builder validation (valid bounds, invalid input rejections).
+  3. Positive execution paths for each capability.
+  4. Error handling and failure wrapping.
+
+### Step 4: Complete the Companion Demo App
+- In `app/src/main/java/com/roni/library/service/demo/MainActivity.java`:
+  - Build interactive UI controls demonstrating every feature of `ServiceRegistry`.
+  - Provide live visual feedback on screen (displaying execution results, status changes, diagnostic telemetry).
+
+### Step 5: Verify Gradle Build & Packaging
+- Run `./gradlew assembleRelease` to verify compilation and ProGuard consumer rules.
+- Run `./gradlew test` to ensure 100% test pass rate.
+- Ensure `jitpack.yml` is properly configured for automated cloud builds.
+
+### Additional Automated Testing Directives:
+- Write parameterized tests for edge-case payloads in `ServiceRegistryTest.java`.
+- Verify memory leaks are prevented by testing singleton `release()` thoroughly.
+
+### ProGuard & Optimization Directives:
+- Keep all public method signatures in `library/consumer-rules.pro`.
+- Ensure non-transitive R classes build cleanly under AGP 8.10.1.
+
+### Pure JVM Decoupling Directives:
+- Avoid direct Android framework references inside core algorithm classes.
+- Inject platform capabilities via `NativePlatformEngine` or interface adapters.
+
+Please output the complete, non-abbreviated code for each file in sequence.
+

@@ -1,0 +1,7 @@
+jdk:
+  - openjdk17
+before_install:
+  - git config --global --add safe.directory '*' || true
+  - chmod +x gradlew
+install:
+  - ./gradlew clean :native-service-sdk:assembleRelease :native-service-sdk:publishToMavenLocal :app:assembleRelease --stacktrace || ./gradlew clean :native-service-sdk:assembleRelease :native-service-sdk:publishToMavenLocal --stacktrace
