@@ -1,5 +1,7 @@
 package com.roni.library.service;
 
+import com.roni.library.contracts.common.IDisposable;
+import com.roni.library.logger.NativeLogger;
 import com.roni.library.service.lifecycle.ServiceLifecycleListener;
 import com.roni.library.service.lifecycle.ServiceState;
 
@@ -8,8 +10,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Abstract base class providing core lifecycle management and observer dispatch for {@link IService}.
+ * Implements Layer 0 {@link IDisposable} and uses Layer 1 {@link NativeLogger} for diagnostic logging.
  */
-public abstract class BaseService implements IService {
+public abstract class BaseService implements IService, IDisposable {
 
     private final String serviceId;
     private final int priority;
@@ -37,6 +40,21 @@ public abstract class BaseService implements IService {
         }
         this.serviceId = serviceId;
         this.priority = priority;
+    }
+
+    @Override
+    public String getServiceName() {
+        return getServiceId();
+    }
+
+    @Override
+    public void onStart() {
+        start();
+    }
+
+    @Override
+    public void onStop() {
+        stop();
     }
 
     @Override
@@ -96,9 +114,11 @@ public abstract class BaseService implements IService {
         try {
             onInitialize();
             transitionState(ServiceState.INITIALIZED);
+            NativeLogger.getInstance().d("BaseService", "Service [" + serviceId + "] initialized.");
         } catch (Throwable t) {
             transitionState(ServiceState.FAILED);
             notifyError(t);
+            NativeLogger.getInstance().e("BaseService", "Failed to initialize service: " + serviceId, t);
             throw new RuntimeException("Failed to initialize service: " + serviceId, t);
         }
     }
@@ -116,11 +136,13 @@ public abstract class BaseService implements IService {
         }
         transitionState(ServiceState.STARTING);
         try {
-            onStart();
+            onServiceStart();
             transitionState(ServiceState.RUNNING);
+            NativeLogger.getInstance().d("BaseService", "Service [" + serviceId + "] started.");
         } catch (Throwable t) {
             transitionState(ServiceState.FAILED);
             notifyError(t);
+            NativeLogger.getInstance().e("BaseService", "Failed to start service: " + serviceId, t);
             throw new RuntimeException("Failed to start service: " + serviceId, t);
         }
     }
@@ -135,11 +157,13 @@ public abstract class BaseService implements IService {
         }
         transitionState(ServiceState.STOPPING);
         try {
-            onStop();
+            onServiceStop();
             transitionState(ServiceState.STOPPED);
+            NativeLogger.getInstance().d("BaseService", "Service [" + serviceId + "] stopped.");
         } catch (Throwable t) {
             transitionState(ServiceState.FAILED);
             notifyError(t);
+            NativeLogger.getInstance().e("BaseService", "Failed to stop service: " + serviceId, t);
             throw new RuntimeException("Failed to stop service: " + serviceId, t);
         }
     }
@@ -157,8 +181,10 @@ public abstract class BaseService implements IService {
         }
         try {
             onDispose();
+            NativeLogger.getInstance().d("BaseService", "Service [" + serviceId + "] disposed.");
         } catch (Throwable t) {
             notifyError(t);
+            NativeLogger.getInstance().e("BaseService", "Error during service dispose: " + serviceId, t);
         } finally {
             transitionState(ServiceState.DISPOSED);
             listeners.clear();
@@ -198,13 +224,13 @@ public abstract class BaseService implements IService {
     /**
      * Subclass hook for start logic.
      */
-    protected void onStart() throws Exception {
+    protected void onServiceStart() throws Exception {
     }
 
     /**
      * Subclass hook for stop logic.
      */
-    protected void onStop() throws Exception {
+    protected void onServiceStop() throws Exception {
     }
 
     /**

@@ -45,7 +45,7 @@
 ### Phase 1: প্যাকেজিং ও কনফিগারেশন সংশোধন (Target: Week 1)
 - [ ] প্রতিটি অ্যান্ড্রয়েড মডিউলে মিসিং `consumer-rules.pro` ফাইল তৈরি করা এবং DTO/ইন্টারফেস কীপ রুলস যোগ করা।
 - [ ] প্রতিটি মডিউলের জন্য একটি স্ট্যান্ডার্ড `AndroidManifest.xml` তৈরি করা।
-- [ ] Maven Publish কনফিগারেশনে Group ID (`com.roni.library`), Version (`1.0.0`) এবং POM মেটাডাটা সম্পূর্ণ করা।
+- [ ] Maven Publish কনফিগারেশনে Group ID (`com.roni.library`), Version (`1.0.1`) এবং POM মেটাডাটা সম্পূর্ণ করা।
 
 ### Phase 2: কনক্রিট অ্যান্ড্রয়েড ওএস বাইন্ডিং (Target: Week 2-3)
 - [ ] `NativePlatformEngine`-এ অ্যান্ড্রয়েড `Context` ইনজেকশন নিশ্চিত করে সত্যিকারের `BatteryManager`, `ClipboardManager` এবং `Toast` কানেক্ট করা।

@@ -1,45 +1,36 @@
+
 package com.roni.library.service.handler;
 
+import com.roni.library.contracts.api.IApiHandler;
+import com.roni.library.contracts.api.IApiCallback;
+import com.roni.library.contracts.api.NativeApiError;
+import com.roni.library.contracts.api.NativeApiRequest;
+import com.roni.library.contracts.api.NativeApiResponse;
+import com.roni.library.logger.NativeLogger;
 import com.roni.library.service.IService;
 import com.roni.library.service.ServiceRegistry;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 /**
- * Command dispatcher mapping RPC actions into {@link ServiceRegistry} queries.
+ * Command dispatcher mapping RPC actions into ServiceRegistry queries.
+ *
+ * Implements Layer 0 IApiHandler and uses Layer 0 callback contracts.
  */
-public class ServiceCommandHandler {
+public class ServiceCommandHandler implements IApiHandler {
 
     public static final String ROUTE_PREFIX = "service";
 
-    /**
-     * Request abstraction representing a native API call.
-     */
-    public static class NativeApiRequest {
-        private final String action;
-        private final Map<String, Object> params;
-
-        public NativeApiRequest(String action, Map<String, Object> params) {
-            this.action = action;
-            this.params = params != null ? params : new HashMap<String, Object>();
-        }
-
-        public String getAction() {
-            return action;
-        }
-
-        public Map<String, Object> getParams() {
-            return params;
-        }
+    @Override
+    public String getPath() {
+        return ROUTE_PREFIX;
     }
 
-    /**
-     * Callback interface for asynchronous API response dispatch.
-     */
-    public interface IApiCallback {
-        void onSuccess(Map<String, Object> result);
-        void onError(int code, String message);
+    @Override
+    public String getAction() {
+        return "*";
     }
 
     public String getRoutePrefix() {
@@ -47,56 +38,192 @@ public class ServiceCommandHandler {
     }
 
     /**
-     * Dispatches command request to registered services.
-     *
-     * @param request  incoming request
-     * @param callback callback to receive response
+     * Executes a service command and returns a structured response.
      */
-    public void handle(NativeApiRequest request, IApiCallback callback) {
+    @Override
+    public NativeApiResponse handleRequest(NativeApiRequest request) {
+
         if (request == null) {
-            if (callback != null) {
-                callback.onError(400, "Request must not be null");
+            return NativeApiResponse.error(
+                    UUID.randomUUID().toString(),
+                    400,
+                    new NativeApiError(
+                            "400",
+                            "Request must not be null"
+                    )
+            );
+        }
+
+        String reqId = request.getRequestId();
+        String action = request.getAction();
+
+        ServiceRegistry registry = ServiceRegistry.getInstance();
+
+        Map<String, Object> responseData = new HashMap<>();
+
+        try {
+
+            if ("list".equalsIgnoreCase(action)) {
+
+                for (IService service : registry.getAllServices()) {
+                    responseData.put(
+                            service.getServiceId(),
+                            service.getState().name()
+                    );
+                }
+
+                NativeLogger.getInstance().d(
+                        "ServiceCommandHandler",
+                        "Handled list request: "
+                                + responseData.size()
+                                + " services found."
+                );
+
+                return NativeApiResponse.success(
+                        reqId,
+                        responseData
+                );
+
+            } else if ("status".equalsIgnoreCase(action)) {
+
+                String serviceId = request.getStringParam(
+                        "serviceId",
+                        null
+                );
+
+                IService service = serviceId != null
+                        ? registry.getServiceByName(serviceId)
+                        : null;
+
+                if (service != null) {
+
+                    responseData.put(
+                            "serviceId",
+                            service.getServiceId()
+                    );
+
+                    responseData.put(
+                            "state",
+                            service.getState().name()
+                    );
+
+                    responseData.put(
+                            "available",
+                            service.isAvailable()
+                    );
+
+                    responseData.put(
+                            "priority",
+                            service.getPriority()
+                    );
+
+                    NativeLogger.getInstance().d(
+                            "ServiceCommandHandler",
+                            "Handled status request for: " + serviceId
+                    );
+
+                    return NativeApiResponse.success(
+                            reqId,
+                            responseData
+                    );
+
+                } else {
+
+                    NativeLogger.getInstance().w(
+                            "ServiceCommandHandler",
+                            "Service not found: " + serviceId
+                    );
+
+                    return NativeApiResponse.error(
+                            reqId,
+                            404,
+                            new NativeApiError(
+                                    "404",
+                                    "Service not found: " + serviceId
+                            )
+                    );
+                }
+
+            } else {
+
+                NativeLogger.getInstance().w(
+                        "ServiceCommandHandler",
+                        "Unknown action requested: " + action
+                );
+
+                return NativeApiResponse.error(
+                        reqId,
+                        400,
+                        new NativeApiError(
+                                "400",
+                                "Unknown action: " + action
+                        )
+                );
             }
+
+        } catch (Throwable t) {
+
+            NativeLogger.getInstance().e(
+                    "ServiceCommandHandler",
+                    "Handler exception: " + t.getMessage(),
+                    t
+            );
+
+            return NativeApiResponse.error(
+                    reqId,
+                    500,
+                    new NativeApiError(
+                            "500",
+                            "Handler exception: " + t.getMessage()
+                    )
+            );
+        }
+    }
+
+    /**
+     * Dispatches a request using the official Contracts callback.
+     *
+     * This method is a synchronous dispatch with callback notification.
+     */
+    public void handle(
+            NativeApiRequest request,
+            IApiCallback callback
+    ) {
+
+        if (callback == null) {
             return;
         }
 
-        String action = request.getAction();
-        ServiceRegistry registry = ServiceRegistry.getInstance();
-        Map<String, Object> response = new HashMap<>();
+        if (request == null) {
 
-        try {
-            if ("list".equalsIgnoreCase(action)) {
-                for (IService service : registry.getAllServices()) {
-                    response.put(service.getServiceId(), service.getState().name());
-                }
-                if (callback != null) {
-                    callback.onSuccess(response);
-                }
-            } else if ("status".equalsIgnoreCase(action)) {
-                String serviceId = (String) request.getParams().get("serviceId");
-                IService service = registry.getServiceByName(serviceId);
-                if (service != null) {
-                    response.put("serviceId", service.getServiceId());
-                    response.put("state", service.getState().name());
-                    response.put("available", service.isAvailable());
-                    response.put("priority", service.getPriority());
-                    if (callback != null) {
-                        callback.onSuccess(response);
-                    }
-                } else {
-                    if (callback != null) {
-                        callback.onError(404, "Service not found: " + serviceId);
-                    }
-                }
-            } else {
-                if (callback != null) {
-                    callback.onError(400, "Unknown action: " + action);
-                }
-            }
-        } catch (Throwable t) {
-            if (callback != null) {
-                callback.onError(500, "Handler exception: " + t.getMessage());
-            }
+            callback.onError(
+                    new NativeApiError(
+                            "400",
+                            "Request must not be null"
+                    )
+            );
+
+            return;
+        }
+
+        NativeApiResponse response = handleRequest(request);
+
+        if (response.isSuccess()) {
+
+            callback.onResponse(response);
+
+        } else {
+
+            NativeApiError error = response.getError();
+
+            callback.onError(
+                    error != null
+                            ? error
+                            : new NativeApiError(
+                            String.valueOf(response.getStatusCode()),
+                            "Unknown service error"
+                    )
+            );
         }
     }
 }

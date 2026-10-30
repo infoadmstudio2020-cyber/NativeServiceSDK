@@ -11,7 +11,7 @@ android {
         minSdk 21
         targetSdk 34
         versionCode 1
-        versionName "1.0.0"
+        versionName "1.0.1"
         consumerProguardFiles "consumer-rules.pro"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -44,6 +44,12 @@ android {
 }
 
 dependencies {
+    // Shared Contracts
+    api 'com.github.infoadmstudio2020-cyber:NativeRuntimeContracts:v1.0.1'
+
+    // Internal Logging
+    implementation 'com.github.infoadmstudio2020-cyber:NativeLoggerSDK:1.0.1'
+
     implementation 'androidx.annotation:annotation:1.7.0'
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
@@ -55,9 +61,9 @@ afterEvaluate {
         publications {
             release(MavenPublication) {
                 from components.findByName('release') ?: components.findByName('java') ?: components.findByName('default')
-                groupId    = 'com.roni.library.service'
+                groupId    = 'com.github.infoadmstudio2020-cyber'
                 artifactId = 'NativeServiceSDK'
-                version    = '1.0.0'
+                version    = '1.0.1'
 
                 pom {
                     name        = 'NativeServiceSDK'

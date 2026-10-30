@@ -12,7 +12,7 @@ Transform the generated Android Studio scaffold project for **NativeServiceSDK**
 - **Companion Demo App**: `app` (includeDemoApp = true)
 - **Maven Group ID**: `com.github.native-runtime`
 - **Artifact ID**: `native-service-sdk`
-- **Semantic Version**: `1.0.0`
+- **Semantic Version**: `1.0.1`
 - **Root Java Package**: `com.roni.library.service`
 - **Primary Public Entry Point**: `ServiceRegistry`
 - **Architecture Classification**: `Layer 1: Core Infrastructure` (`L1`)
@@ -60,7 +60,7 @@ Transform the generated Android Studio scaffold project for **NativeServiceSDK**
 ### Step 1: Audit and Wire Layer Dependencies
 - Open `library/build.gradle` and verify dependencies.
 - Ensure `com.android.library` and `maven-publish` are active.
-- Verify MavenPublication coordinates: `groupId: com.github.native-runtime`, `artifactId: native-service-sdk`, `version: 1.0.0`.
+- Verify MavenPublication coordinates: `groupId: com.github.native-runtime`, `artifactId: native-service-sdk`, `version: 1.0.1`.
 
 ### Step 2: Implement Core Engine & Internal Models
 - Replace placeholder stub methods in `ServiceRegistry.java` with actual state machine logic, thread pool executors, and error handling guards.

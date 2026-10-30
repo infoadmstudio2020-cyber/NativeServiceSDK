@@ -1,7 +1,7 @@
 # NativeRuntime Android SDK Ecosystem - মাস্টার আর্কিটেকচার ও টেকনিক্যাল ডকুমেন্টেশন
 
 > **প্রস্তুতকারক:** Senior Android SDK Architect & Technical Documentation Engineer  
-> **ইকোসিস্টেম সংস্করণ:** 1.0.0-provisional  
+> **ইকোসিস্টেম সংস্করণ:** 1.0.1-provisional  
 > **সর্বমোট মডিউল:** ১৫টি স্বতন্ত্র Android/Java লাইব্রেরি  
 > **মোট সোর্স লাইন সংখ্যা (LOC):** 12329 লাইন  
 > **গড় সমাপ্তির হার (Average Ecosystem Completion):** 86.8%

@@ -39,7 +39,14 @@ dependencyResolutionManagement {
 In your module's `build.gradle`:
 ```groovy
 dependencies {
-    implementation 'com.github.infoadmstudio2020-cyber:NativeServiceSDK:1.0.0'
+    // NativeServiceSDK (Layer 1)
+    implementation 'com.github.infoadmstudio2020-cyber:NativeServiceSDK:1.0.1'
+
+    // Shared Contracts (Layer 0)
+    api 'com.github.infoadmstudio2020-cyber:NativeRuntimeContracts:v1.0.1'
+
+    // Internal Logging (Layer 1)
+    implementation 'com.github.infoadmstudio2020-cyber:NativeLoggerSDK:1.0.1'
 }
 ```
 

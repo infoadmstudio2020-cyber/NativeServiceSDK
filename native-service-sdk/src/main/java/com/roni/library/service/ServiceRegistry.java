@@ -1,5 +1,8 @@
 package com.roni.library.service;
 
+import com.roni.library.contracts.common.IDisposable;
+import com.roni.library.contracts.common.RuntimeState;
+import com.roni.library.logger.NativeLogger;
 import com.roni.library.service.lifecycle.ServiceLifecycle;
 import com.roni.library.service.lifecycle.ServiceLifecycleListener;
 import com.roni.library.service.lifecycle.ServiceState;
@@ -13,11 +16,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Central microkernel service registry and dependency container for NativeRuntime ecosystem.
+ * Implements Layer 0 {@link com.roni.library.contracts.service.IServiceRegistry} and {@link IDisposable}.
  */
-public class ServiceRegistry {
+public class ServiceRegistry implements com.roni.library.contracts.service.IServiceRegistry, IDisposable {
 
     private static volatile ServiceRegistry instance;
     private static final Object INSTANCE_LOCK = new Object();
@@ -25,6 +30,31 @@ public class ServiceRegistry {
     private final Map<Class<? extends IService>, IServiceProvider<? extends IService>> typedProviders = new ConcurrentHashMap<>();
     private final Map<String, IServiceProvider<? extends IService>> namedProviders = new ConcurrentHashMap<>();
     private final List<ServiceLifecycleListener> globalListeners = new CopyOnWriteArrayList<>();
+    private final AtomicReference<RuntimeState> runtimeState = new AtomicReference<>(RuntimeState.READY);
+
+    private static class ContractServiceAdapter extends BaseService {
+        private final com.roni.library.contracts.service.IService delegate;
+
+        ContractServiceAdapter(com.roni.library.contracts.service.IService delegate) {
+            super(delegate.getServiceName() != null ? delegate.getServiceName() : delegate.getClass().getName());
+            this.delegate = delegate;
+        }
+
+        @Override
+        protected void onServiceStart() throws Exception {
+            delegate.onStart();
+        }
+
+        @Override
+        protected void onServiceStop() throws Exception {
+            delegate.onStop();
+        }
+
+        @Override
+        public boolean isRunning() {
+            return delegate.isRunning();
+        }
+    }
 
     private final ServiceLifecycleListener internalForwarder = new ServiceLifecycleListener() {
         @Override
@@ -104,20 +134,34 @@ public class ServiceRegistry {
 
     /**
      * Registers a pre-instantiated service instance.
+     * Implements {@link com.roni.library.contracts.service.IServiceRegistry#registerService(Class, com.roni.library.contracts.service.IService)}.
      *
      * @param serviceClass    service interface or class
      * @param serviceInstance instance of the service
      * @param <T>             type of service
      */
-    public <T extends IService> void registerService(Class<T> serviceClass, T serviceInstance) {
+    @Override
+    @SuppressWarnings("unchecked")
+    public <T extends com.roni.library.contracts.service.IService> void registerService(Class<T> serviceClass, T serviceInstance) {
         if (serviceClass == null || serviceInstance == null) {
             throw new IllegalArgumentException("serviceClass and serviceInstance must not be null");
         }
-        serviceInstance.addLifecycleListener(internalForwarder);
-        SingletonServiceProvider<T> provider = SingletonServiceProvider.of(serviceInstance);
-        typedProviders.put(serviceClass, provider);
-        namedProviders.put(serviceInstance.getServiceId(), provider);
-        namedProviders.put(serviceClass.getName(), provider);
+        if (serviceInstance instanceof IService) {
+            IService instance = (IService) serviceInstance;
+            instance.addLifecycleListener(internalForwarder);
+            SingletonServiceProvider<IService> provider = SingletonServiceProvider.of(instance);
+            typedProviders.put((Class<? extends IService>) serviceClass, provider);
+            namedProviders.put(instance.getServiceId(), provider);
+            namedProviders.put(serviceClass.getName(), provider);
+        } else {
+            ContractServiceAdapter adapter = new ContractServiceAdapter(serviceInstance);
+            adapter.addLifecycleListener(internalForwarder);
+            SingletonServiceProvider<IService> provider = SingletonServiceProvider.of(adapter);
+            typedProviders.put((Class<? extends IService>) serviceClass, provider);
+            namedProviders.put(adapter.getServiceId(), provider);
+            namedProviders.put(serviceClass.getName(), provider);
+        }
+        NativeLogger.getInstance().d("ServiceRegistry", "Registered service: " + serviceClass.getName());
     }
 
     /**
@@ -148,28 +192,55 @@ public class ServiceRegistry {
         namedProviders.put(name, provider);
     }
 
+
     /**
      * Unregisters a service by class.
      *
      * @param serviceClass class to unregister
-     * @param <T>          type of service
+     */
+    @Override
+    public void unregisterService(
+            Class<? extends com.roni.library.contracts.service.IService> serviceClass) {
+
+        if (serviceClass == null) {
+            return;
+        }
+
+        IServiceProvider<? extends IService> removed =
+                typedProviders.remove(serviceClass);
+
+        namedProviders.remove(serviceClass.getName());
+
+        if (removed != null) {
+            IService service = removed.get();
+
+            if (service != null) {
+                namedProviders.remove(service.getServiceId());
+                service.removeLifecycleListener(internalForwarder);
+            }
+
+            NativeLogger.getInstance().d(
+                    "ServiceRegistry",
+                    "Unregistered service: " + serviceClass.getName()
+            );
+        }
+    }
+
+
+    /**
+     * Legacy boolean unregister by class.
+     *
+     * @param serviceClass class to unregister
+     * @param <T> type
      * @return true if found and removed
      */
-    public <T extends IService> boolean unregisterService(Class<T> serviceClass) {
+    public <T extends IService> boolean unregisterServiceByClass(Class<T> serviceClass) {
         if (serviceClass == null) {
             return false;
         }
-        IServiceProvider<? extends IService> removed = typedProviders.remove(serviceClass);
-        namedProviders.remove(serviceClass.getName());
-        if (removed != null) {
-            IService s = removed.get();
-            if (s != null) {
-                namedProviders.remove(s.getServiceId());
-                s.removeLifecycleListener(internalForwarder);
-            }
-            return true;
-        }
-        return false;
+        boolean exists = typedProviders.containsKey(serviceClass);
+        unregisterService(serviceClass);
+        return exists;
     }
 
     /**
@@ -195,23 +266,25 @@ public class ServiceRegistry {
 
     /**
      * Resolves a service by class type.
+     * Implements {@link com.roni.library.contracts.service.IServiceRegistry#getService(Class)}.
      *
      * @param serviceClass target class
      * @param <T>          type of service
      * @return service instance or null if not registered
      */
+    @Override
     @SuppressWarnings("unchecked")
-    public <T extends IService> T getService(Class<T> serviceClass) {
+    public <T extends com.roni.library.contracts.service.IService> T getService(Class<T> serviceClass) {
         if (serviceClass == null) {
             return null;
         }
         IServiceProvider<? extends IService> provider = typedProviders.get(serviceClass);
         if (provider != null) {
-            T s = (T) provider.get();
+            IService s = provider.get();
             if (s != null) {
                 s.addLifecycleListener(internalForwarder);
             }
-            return s;
+            return (T) s;
         }
         // Fallback search across registered services
         for (IServiceProvider<? extends IService> p : typedProviders.values()) {
@@ -247,11 +320,13 @@ public class ServiceRegistry {
 
     /**
      * Checks if a service is registered.
+     * Implements {@link com.roni.library.contracts.service.IServiceRegistry#hasService(Class)}.
      *
      * @param serviceClass target class
      * @return true if present
      */
-    public boolean hasService(Class<? extends IService> serviceClass) {
+    @Override
+    public boolean hasService(Class<? extends com.roni.library.contracts.service.IService> serviceClass) {
         return serviceClass != null && (typedProviders.containsKey(serviceClass) || getService(serviceClass) != null);
     }
 
@@ -326,5 +401,21 @@ public class ServiceRegistry {
         typedProviders.clear();
         namedProviders.clear();
         globalListeners.clear();
+    }
+
+    public RuntimeState getRuntimeState() {
+        return runtimeState.get();
+    }
+
+    @Override
+    public void dispose() {
+        disposeAllServices();
+        runtimeState.set(RuntimeState.TERMINATED);
+        NativeLogger.getInstance().i("ServiceRegistry", "ServiceRegistry disposed all services and transitioned to TERMINATED.");
+    }
+
+    @Override
+    public boolean isDisposed() {
+        return runtimeState.get() == RuntimeState.TERMINATED;
     }
 }

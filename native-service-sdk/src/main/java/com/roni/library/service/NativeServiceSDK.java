@@ -53,6 +53,20 @@ public final class NativeServiceSDK {
         }
         this.appContext = context != null ? context.getApplicationContext() : null;
         this.config = config != null ? config : new NativeServiceSDKConfig.Builder().build();
+
+        // Initialize NativeLoggerSDK if available
+        try {
+            com.roni.library.logger.NativeLoggerSDKConfig loggerConfig = new com.roni.library.logger.NativeLoggerSDKConfig.Builder()
+                    .debugEnabled(this.config.isDebugEnabled())
+                    .tag(this.config.getTag())
+                    .timeout(this.config.getTimeout())
+                    .build();
+            com.roni.library.logger.NativeLoggerSDK.getInstance().init(this.appContext, loggerConfig);
+            com.roni.library.logger.NativeLogger.getInstance().i(this.config.getTag(), "NativeLoggerSDK initialized inside NativeServiceSDK.");
+        } catch (Throwable t) {
+            Log.w(this.config.getTag(), "NativeLoggerSDK initialization fallback: " + t.getMessage());
+        }
+
         this.registry = ServiceRegistry.getInstance();
 
         // Register default builtin services
@@ -62,6 +76,7 @@ public final class NativeServiceSDK {
         if (this.config.isDebugEnabled()) {
             Log.d(this.config.getTag(), "NativeServiceSDK initialized successfully");
         }
+        com.roni.library.logger.NativeLogger.getInstance().i(this.config.getTag(), "NativeServiceSDK initialized successfully.");
     }
 
     /**
@@ -135,8 +150,11 @@ public final class NativeServiceSDK {
      */
     public synchronized void release() {
         if (registry != null) {
-            registry.disposeAllServices();
+            registry.dispose();
             registry = null;
+        }
+        if (config != null) {
+            com.roni.library.logger.NativeLogger.getInstance().i(config.getTag(), "NativeServiceSDK released.");
         }
         initialized.set(false);
         appContext = null;

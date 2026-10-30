@@ -5,8 +5,9 @@ import com.roni.library.service.lifecycle.ServiceState;
 
 /**
  * Universal service contract for components managed by {@link com.roni.library.service.ServiceRegistry}.
+ * Inherits and standardizes the Layer 0 universal contract from {@link com.roni.library.contracts.service.IService}.
  */
-public interface IService {
+public interface IService extends com.roni.library.contracts.service.IService {
 
     /**
      * Unique identifier for this service.
@@ -14,6 +15,33 @@ public interface IService {
      * @return unique string ID
      */
     String getServiceId();
+
+    /**
+     * Returns the service name matching {@link com.roni.library.contracts.service.IService#getServiceName()}.
+     * Defaults to {@link #getServiceId()}.
+     *
+     * @return service name string
+     */
+    @Override
+    default String getServiceName() {
+        return getServiceId();
+    }
+
+    /**
+     * Layer 0 contract hook invoked when starting the service.
+     */
+    @Override
+    default void onStart() {
+        start();
+    }
+
+    /**
+     * Layer 0 contract hook invoked when stopping the service.
+     */
+    @Override
+    default void onStop() {
+        stop();
+    }
 
     /**
      * Execution priority during batch initialization/startup. Higher values execute first.

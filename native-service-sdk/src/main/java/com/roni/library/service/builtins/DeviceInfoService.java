@@ -27,6 +27,25 @@ public class DeviceInfoService extends BaseService {
         return cachedInfo;
     }
 
+    /**
+     * Converts to Layer 0 {@link com.roni.library.contracts.platform.DeviceInfoDTO}.
+     *
+     * @return Layer 0 device info DTO
+     */
+    public com.roni.library.contracts.platform.DeviceInfoDTO toContractDTO() {
+        DeviceInfoDTO d = cachedInfo;
+        long totalMemory = Runtime.getRuntime().totalMemory();
+        String uuid = java.util.UUID.nameUUIDFromBytes((d.getManufacturer() + ":" + d.getModel()).getBytes()).toString();
+        return new com.roni.library.contracts.platform.DeviceInfoDTO(
+                d.getManufacturer(),
+                d.getModel(),
+                d.getOsVersion(),
+                d.getSdkInt(),
+                uuid,
+                totalMemory
+        );
+    }
+
     @Override
     protected void onInitialize() throws Exception {
     }

@@ -24,6 +24,21 @@ public class BatteryStatusService extends BaseService {
         return currentStatus;
     }
 
+    /**
+     * Converts to Layer 0 {@link com.roni.library.contracts.platform.BatteryStatusDTO}.
+     *
+     * @return Layer 0 battery status DTO
+     */
+    public com.roni.library.contracts.platform.BatteryStatusDTO toContractDTO() {
+        BatteryStatusDTO s = currentStatus;
+        return new com.roni.library.contracts.platform.BatteryStatusDTO(
+                s.getLevel(),
+                s.isCharging(),
+                s.getPlugType(),
+                s.getTemperatureCelsius()
+        );
+    }
+
     @Override
     protected void onInitialize() throws Exception {
         // Ready for battery state updates

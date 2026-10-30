@@ -7,6 +7,11 @@ import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.roni.library.contracts.api.IApiCallback;
+import com.roni.library.contracts.api.NativeApiError;
+import com.roni.library.contracts.api.NativeApiRequest;
+import com.roni.library.contracts.api.NativeApiResponse;
+import com.roni.library.logger.NativeLogger;
 import com.roni.library.service.BaseService;
 import com.roni.library.service.IService;
 import com.roni.library.service.NativeServiceSDK;
@@ -86,6 +91,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void log(String message) {
         String timestamp = dateFormat.format(new Date());
+        NativeLogger.getInstance().i("MainActivity", "[" + timestamp + "] " + message);
         if (tvStatus != null) {
             String current = tvStatus.getText().toString();
             tvStatus.setText(current + "[" + timestamp + "] " + message + "\n");
@@ -147,20 +153,37 @@ public class MainActivity extends AppCompatActivity {
         log("Registered custom service: " + customId + " (Priority: 50)");
     }
 
+
     private void dispatchCommand() {
+
         ServiceCommandHandler handler = new ServiceCommandHandler();
-        handler.handle(new ServiceCommandHandler.NativeApiRequest("list", null), new ServiceCommandHandler.IApiCallback() {
+
+        NativeApiRequest request = new NativeApiRequest.Builder(
+                "service",
+                "list"
+        ).build();
+
+        handler.handle(request, new IApiCallback() {
+
             @Override
-            public void onSuccess(Map<String, Object> result) {
-                log("RPC Command 'list' returned " + result.size() + " active services.");
+            public void onResponse(NativeApiResponse response) {
+
+                Map<String, Object> result = response.getData();
+
+                log("RPC Command 'list' returned "
+                        + result.size()
+                        + " active services.");
             }
 
             @Override
-            public void onError(int code, String message) {
-                log("RPC Error (" + code + "): " + message);
+            public void onError(NativeApiError error) {
+
+                log("RPC Error (" + error.getCode() + "): "
+                        + error.getMessage());
             }
         });
     }
+
 
     private void releaseSDK() {
         NativeServiceSDK.getInstance().release();

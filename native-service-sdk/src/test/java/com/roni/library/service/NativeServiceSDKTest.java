@@ -1,5 +1,9 @@
 package com.roni.library.service;
 
+import com.roni.library.contracts.api.IApiCallback;
+import com.roni.library.contracts.api.NativeApiError;
+import com.roni.library.contracts.api.NativeApiRequest;
+import com.roni.library.contracts.api.NativeApiResponse;
 import com.roni.library.service.builtins.BatteryStatusDTO;
 import com.roni.library.service.builtins.BatteryStatusService;
 import com.roni.library.service.builtins.DeviceInfoDTO;
@@ -128,14 +132,21 @@ public class NativeServiceSDKTest {
         assertTrue(service.isDisposed());
     }
 
+
     @Test
     public void serviceRegistry_registrationAndLookup() {
+
         ServiceRegistry registry = ServiceRegistry.getInstance();
+
         TestService service1 = new TestService("svc.one", 10);
         TestService service2 = new TestService("svc.two", 20);
 
         registry.registerService(TestService.class, service1);
-        registry.registerProviderByName("svc.two", SingletonServiceProvider.of(service2));
+
+        registry.registerProviderByName(
+                "svc.two",
+                SingletonServiceProvider.of(service2)
+        );
 
         assertTrue(registry.hasService(TestService.class));
         assertTrue(registry.hasServiceByName("svc.two"));
@@ -144,14 +155,24 @@ public class NativeServiceSDKTest {
         assertSame(service2, registry.getServiceByName("svc.two"));
 
         List<IService> all = registry.getAllServices();
+
         assertTrue(all.contains(service1));
         assertTrue(all.contains(service2));
-        // Priority ordering: service2 (priority 20) should be before service1 (priority 10)
+
+        // Priority ordering: higher priority first.
         assertEquals(service2, all.get(0));
 
-        assertTrue(registry.unregisterService(TestService.class));
+        // Unregister service.
+        registry.unregisterService(TestService.class);
+
+        // Verify removal.
         assertFalse(registry.hasService(TestService.class));
+
+        // Verify named service remains registered.
+        assertTrue(registry.hasServiceByName("svc.two"));
+        assertSame(service2, registry.getServiceByName("svc.two"));
     }
+
 
     @Test
     public void serviceInjector_injectsAnnotatedFields() {
@@ -219,38 +240,172 @@ public class NativeServiceSDKTest {
         ServiceCommandHandler handler = new ServiceCommandHandler();
         assertEquals("service", handler.getRoutePrefix());
 
-        final AtomicBoolean success = new AtomicBoolean(false);
-        handler.handle(new ServiceCommandHandler.NativeApiRequest("list", null), new ServiceCommandHandler.IApiCallback() {
+
+        AtomicBoolean success = new AtomicBoolean(false);
+
+        NativeApiRequest request = new NativeApiRequest.Builder(
+                "service",
+                "list"
+        ).build();
+
+        handler.handle(request, new IApiCallback() {
+
             @Override
-            public void onSuccess(Map<String, Object> result) {
-                assertTrue(result.containsKey("command.service"));
+            public void onResponse(NativeApiResponse response) {
+
+                assertTrue(
+                        "Response should be successful",
+                        response.isSuccess()
+                );
+
+                Map<String, Object> result = response.getData();
+
+                assertTrue(
+                        "Expected command.service in response",
+                        result.containsKey("command.service")
+                );
+
                 success.set(true);
             }
 
             @Override
-            public void onError(int code, String message) {
-                fail("Handler returned error: " + message);
+            public void onError(NativeApiError error) {
+
+                fail("Handler returned error: " + error.getMessage());
             }
         });
-        assertTrue(success.get());
+
+        assertTrue("Handler callback was not successful", success.get());
+
+
 
         Map<String, Object> params = new HashMap<>();
         params.put("serviceId", "command.service");
-        final AtomicBoolean statusSuccess = new AtomicBoolean(false);
-        handler.handle(new ServiceCommandHandler.NativeApiRequest("status", params), new ServiceCommandHandler.IApiCallback() {
+
+        AtomicBoolean statusSuccess = new AtomicBoolean(false);
+
+        NativeApiRequest listRequest = new NativeApiRequest.Builder(
+                "service",
+                "list"
+        ).build();
+
+        handler.handle(listRequest, new IApiCallback() {
             @Override
-            public void onSuccess(Map<String, Object> result) {
-                assertEquals("command.service", result.get("serviceId"));
-                assertEquals("RUNNING", result.get("state"));
+            public void onResponse(NativeApiResponse response) {
+                assertTrue(response.isSuccess());
+
+                Map<String, Object> result = response.getData();
+                assertTrue(result.containsKey("command.service"));
+
+                success.set(true);
+            }
+
+            @Override
+            public void onError(NativeApiError error) {
+                fail("Handler returned error: " + error.getMessage());
+            }
+        });
+
+        handler.handle(request, new IApiCallback() {
+
+            @Override
+            public void onResponse(NativeApiResponse response) {
+
+                assertTrue(
+                        "Status response should be successful",
+                        response.isSuccess()
+                );
+
+                Map<String, Object> result = response.getData();
+
+                assertEquals(
+                        "command.service",
+                        result.get("serviceId")
+                );
+
+                assertEquals(
+                        "RUNNING",
+                        result.get("state")
+                );
+
                 statusSuccess.set(true);
             }
 
             @Override
-            public void onError(int code, String message) {
-                fail("Handler returned error: " + message);
+            public void onError(NativeApiError error) {
+
+                fail("Handler returned error: " + error.getMessage());
             }
         });
-        assertTrue(statusSuccess.get());
+
+        assertTrue(
+                "Status callback was not successful",
+                statusSuccess.get()
+        );
+
+    }
+
+    @Test
+    public void nativeRuntimeContracts_compliance() {
+        ServiceRegistry registry = ServiceRegistry.getInstance();
+        TestService service = new TestService("contract.service", 15);
+
+        // Test Layer 0 IService methods
+        assertEquals("contract.service", service.getServiceName());
+        assertFalse(service.isRunning());
+        service.onStart();
+        assertTrue(service.isRunning());
+        service.onStop();
+        assertFalse(service.isRunning());
+
+        // Test Layer 0 IServiceRegistry methods
+        com.roni.library.contracts.service.IServiceRegistry contractRegistry = registry;
+        contractRegistry.registerService(TestService.class, service);
+        assertTrue(contractRegistry.hasService(TestService.class));
+        assertSame(service, contractRegistry.getService(TestService.class));
+        contractRegistry.unregisterService(TestService.class);
+        assertFalse(contractRegistry.hasService(TestService.class));
+
+        // Test Layer 0 RuntimeState and IDisposable
+        assertEquals(com.roni.library.contracts.common.RuntimeState.READY, registry.getRuntimeState());
+        registry.dispose();
+        assertTrue(registry.isDisposed());
+        assertEquals(com.roni.library.contracts.common.RuntimeState.TERMINATED, registry.getRuntimeState());
+    }
+
+    @Test
+    public void contractDTOs_and_apiHandler() {
+        BatteryStatusService batteryService = new BatteryStatusService();
+        batteryService.updateBatteryStatus(90, true, "USB", 27.0f);
+        com.roni.library.contracts.platform.BatteryStatusDTO batDTO = batteryService.toContractDTO();
+        assertEquals(90, batDTO.getLevel());
+        assertTrue(batDTO.isCharging());
+        assertEquals("USB", batDTO.getPluggedType());
+
+        DeviceInfoService deviceService = new DeviceInfoService();
+        com.roni.library.contracts.platform.DeviceInfoDTO devDTO = deviceService.toContractDTO();
+        assertNotNull(devDTO.getManufacturer());
+        assertNotNull(devDTO.getModel());
+
+        ServiceCommandHandler handler = new ServiceCommandHandler();
+        assertEquals("service", handler.getPath());
+        assertEquals("*", handler.getAction());
+
+        com.roni.library.contracts.api.NativeApiRequest req = new com.roni.library.contracts.api.NativeApiRequest(
+                "req-1", "service", "list", new HashMap<String, Object>(), System.currentTimeMillis()
+        );
+        com.roni.library.contracts.api.NativeApiResponse resp = handler.handleRequest(req);
+        assertTrue(resp.isSuccess());
+
+        com.roni.library.logger.NativeLogger.getInstance().i("Test", "Completed contractDTOs_and_apiHandler test");
+    }
+
+    @Test
+    public void nativeLogger_integration() {
+        com.roni.library.logger.NativeLogger logger = com.roni.library.logger.NativeLogger.getInstance();
+        assertNotNull(logger);
+        logger.d("TestTag", "Testing NativeLoggerSDK message output");
+        logger.i("TestTag", "Informational log entry");
     }
 
     private static class TestService extends BaseService {
