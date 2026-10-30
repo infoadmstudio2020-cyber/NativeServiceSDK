@@ -1,5 +1,13 @@
 package com.roni.library.service;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import com.roni.library.contracts.api.IApiCallback;
 import com.roni.library.contracts.api.NativeApiError;
 import com.roni.library.contracts.api.NativeApiRequest;
@@ -23,8 +31,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import static org.junit.Assert.*;
 
 /**
  * Comprehensive Unit tests for {@link NativeServiceSDK} and its subsystem components.
@@ -229,60 +235,23 @@ public class NativeServiceSDKTest {
         assertEquals("CELLULAR", statusMap.get("type"));
     }
 
+
     @Test
     public void serviceCommandHandler_dispatchesCommands() {
         ServiceRegistry registry = ServiceRegistry.getInstance();
+
         TestService service = new TestService("command.service", 1);
         registry.registerService(TestService.class, service);
+
         service.initialize();
         service.start();
 
         ServiceCommandHandler handler = new ServiceCommandHandler();
+
         assertEquals("service", handler.getRoutePrefix());
 
-
+        // 1. Test LIST command
         AtomicBoolean success = new AtomicBoolean(false);
-
-        NativeApiRequest request = new NativeApiRequest.Builder(
-                "service",
-                "list"
-        ).build();
-
-        handler.handle(request, new IApiCallback() {
-
-            @Override
-            public void onResponse(NativeApiResponse response) {
-
-                assertTrue(
-                        "Response should be successful",
-                        response.isSuccess()
-                );
-
-                Map<String, Object> result = response.getData();
-
-                assertTrue(
-                        "Expected command.service in response",
-                        result.containsKey("command.service")
-                );
-
-                success.set(true);
-            }
-
-            @Override
-            public void onError(NativeApiError error) {
-
-                fail("Handler returned error: " + error.getMessage());
-            }
-        });
-
-        assertTrue("Handler callback was not successful", success.get());
-
-
-
-        Map<String, Object> params = new HashMap<>();
-        params.put("serviceId", "command.service");
-
-        AtomicBoolean statusSuccess = new AtomicBoolean(false);
 
         NativeApiRequest listRequest = new NativeApiRequest.Builder(
                 "service",
@@ -292,31 +261,45 @@ public class NativeServiceSDKTest {
         handler.handle(listRequest, new IApiCallback() {
             @Override
             public void onResponse(NativeApiResponse response) {
-                assertTrue(response.isSuccess());
+                assertTrue("List response should be successful",
+                        response.isSuccess());
 
                 Map<String, Object> result = response.getData();
-                assertTrue(result.containsKey("command.service"));
+
+                assertNotNull("List response data should not be null", result);
+                assertTrue("Expected command.service in response",
+                        result.containsKey("command.service"));
 
                 success.set(true);
             }
 
             @Override
             public void onError(NativeApiError error) {
-                fail("Handler returned error: " + error.getMessage());
+                fail("List command failed: " + error.getMessage());
             }
         });
 
-        handler.handle(request, new IApiCallback() {
+        assertTrue("List callback was not successful", success.get());
 
+        // 2. Test STATUS command
+        AtomicBoolean statusSuccess = new AtomicBoolean(false);
+
+        NativeApiRequest statusRequest = new NativeApiRequest.Builder(
+                "service",
+                "status"
+        )
+                .param("serviceId", "command.service")
+                .build();
+
+        handler.handle(statusRequest, new IApiCallback() {
             @Override
             public void onResponse(NativeApiResponse response) {
-
-                assertTrue(
-                        "Status response should be successful",
-                        response.isSuccess()
-                );
+                assertTrue("Status response should be successful",
+                        response.isSuccess());
 
                 Map<String, Object> result = response.getData();
+
+                assertNotNull("Status response data should not be null", result);
 
                 assertEquals(
                         "command.service",
@@ -333,16 +316,12 @@ public class NativeServiceSDKTest {
 
             @Override
             public void onError(NativeApiError error) {
-
-                fail("Handler returned error: " + error.getMessage());
+                fail("Status command failed: " + error.getMessage());
             }
         });
 
-        assertTrue(
-                "Status callback was not successful",
-                statusSuccess.get()
-        );
-
+        assertTrue("Status callback was not successful",
+                statusSuccess.get());
     }
 
     @Test
